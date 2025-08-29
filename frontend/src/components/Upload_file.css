@@ -1,0 +1,379 @@
+/* Upload File Wrapper */
+.upload-file-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Header */
+.upload-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.upload-title {
+  font-size: 2rem; /* 32px */
+  font-weight: 700; /* Bold */
+  color: #1f2937; /* Gray-800 */
+}
+
+.upload-close-button {
+  padding: 8px;
+  border-radius: 9999px; /* Full rounded */
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.upload-close-button:hover {
+  background-color: #f3f4f6; /* Gray-100 */
+}
+
+.upload-close-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #6366f1; /* Indigo-500 ring */
+}
+
+.upload-close-icon {
+  height: 1.75rem; /* 28px */
+  width: 1.75rem; /* 28px */
+  color: #4b5563; /* Gray-600 */
+}
+
+/* Upload Type Tabs */
+.upload-type-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background-color: #f3f4f6; /* Gray-100 */
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.tab-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-radius: 6px;
+  font-weight: 600; /* Semi-bold */
+  font-size: 1.125rem; /* 18px */
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: #4b5563; /* Gray-700 */
+}
+
+.tab-button.active {
+  background-color: #4f46e5; /* Indigo-600 */
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.tab-button:not(.active):hover {
+  background-color: #e5e7eb; /* Gray-200 */
+}
+
+.tab-icon {
+  height: 1.5rem; /* 24px */
+  width: 1.5rem; /* 24px */
+  margin-right: 8px;
+}
+
+/* File Upload Area */
+.upload-area {
+  flex: 1;
+  border: 2px dashed #d1d5db; /* Gray-300 */
+  background-color: #f9fafb; /* Gray-50 */
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease-in-out;
+}
+
+.upload-area.dragging {
+  border-color: #6366f1; /* Indigo-500 */
+  background-color: #eef2ff; /* Indigo-50 */
+}
+
+.upload-area-icon {
+  width: 5rem; /* 80px */
+  height: 5rem; /* 80px */
+  margin-bottom: 16px;
+  color: #9ca3af; /* Gray-400 */
+  transition: color 0.3s ease-in-out;
+}
+
+.upload-area.dragging .upload-area-icon {
+  color: #4f46e5; /* Indigo-600 */
+  animation: bounceEffect 0.8s infinite alternate; /* Simple bounce */
+}
+
+.upload-area-text {
+  font-size: 1.25rem; /* 20px */
+  color: #374151; /* Gray-700 */
+  font-weight: 500; /* Medium */
+  margin-bottom: 8px;
+}
+
+.upload-area-subtext {
+  font-size: 0.875rem; /* 14px */
+  color: #6b7280; /* Gray-500 */
+  margin-bottom: 16px;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.browse-files-button {
+  padding: 12px 32px;
+  background-color: #6366f1; /* Indigo-500 */
+  color: white;
+  font-weight: 600; /* Semi-bold */
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease-in-out;
+  cursor: pointer;
+  border: none;
+}
+
+.browse-files-button:hover {
+  background-color: #4f46e5; /* Indigo-600 */
+}
+
+.browse-files-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #6366f1;
+}
+
+/* Link Input Area */
+.link-input-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  background-color: #f9fafb; /* Gray-50 */
+  border: 1px solid #d1d5db; /* Gray-300 */
+  border-radius: 12px;
+}
+
+.link-input-text {
+  font-size: 1.25rem; /* 20px */
+  color: #374151; /* Gray-700 */
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.link-input-field {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid #d1d5db; /* Gray-300 */
+  border-radius: 8px;
+  font-size: 1.125rem; /* 18px */
+  margin-bottom: 16px;
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.link-input-field:focus {
+  outline: none;
+  border-color: #6366f1; /* Indigo-500 */
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.add-link-button {
+  padding: 12px 32px;
+  background-color: #6366f1; /* Indigo-500 */
+  color: white;
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease-in-out;
+  cursor: pointer;
+  border: none;
+}
+
+.add-link-button:hover {
+  background-color: #4f46e5; /* Indigo-600 */
+}
+
+.add-link-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #6366f1;
+}
+
+/* Uploaded Items Display */
+.uploaded-items-display {
+  margin-top: 24px;
+  flex-grow: 1;
+  overflow-y: auto;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.uploaded-items-title {
+  font-size: 1.25rem; /* 20px */
+  font-weight: 600;
+  color: #374151; /* Gray-700 */
+  margin-bottom: 16px;
+}
+
+.no-items-message {
+  font-size: 1rem;
+  color: #6b7280; /* Gray-500 */
+  text-align: center;
+  padding: 16px;
+}
+
+.uploaded-items-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.uploaded-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #f9fafb; /* Gray-100 */
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb; /* Gray-200 */
+  transition: all 0.2s ease-in-out;
+}
+
+.uploaded-item:hover {
+  background-color: #eff6ff; /* Blue-50 */
+  border-color: #bfdbfe; /* Blue-200 */
+}
+
+.item-info {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+  min-width: 0; /* Allow content to shrink */
+}
+
+.file-icon {
+  height: 1.5rem; /* 24px */
+  width: 1.5rem; /* 24px */
+  margin-right: 12px;
+  flex-shrink: 0; /* Prevent icon from shrinking */
+}
+
+.pdf-icon { color: #ef4444; } /* Red-500 */
+.txt-icon { color: #3b82f6; } /* Blue-500 */
+.link-icon { color: #22c55e; } /* Green-500 */
+.default-icon { color: #6b7280; } /* Gray-500 */
+
+
+.item-name {
+  font-size: 1.125rem; /* 18px */
+  color: #1f2937; /* Gray-800 */
+  font-weight: 500;
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Add ellipsis for overflow */
+  flex-grow: 1;
+}
+
+.item-status-icon {
+  height: 1.5rem; /* 24px */
+  width: 1.5rem; /* 24px */
+  color: #22c55e; /* Green-500 */
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.remove-item-button {
+  padding: 8px;
+  border-radius: 9999px; /* Full rounded */
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  flex-shrink: 0; /* Prevent button from shrinking */
+}
+
+.remove-item-button:hover {
+  background-color: #fee2e2; /* Red-100 */
+}
+
+.remove-item-icon {
+  height: 1.5rem; /* 24px */
+  width: 1.5rem; /* 24px */
+  color: #ef4444; /* Red-500 */
+}
+
+.remove-item-button:hover .remove-item-icon {
+  color: #b91c1c; /* Red-700 */
+}
+
+.remove-item-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #ef4444; /* Red ring on focus */
+}
+
+/* Animations for Upload_file.jsx */
+@keyframes bounceEffect {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Responsive adjustments for Upload_file.css */
+@media (max-width: 768px) {
+  .upload-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .upload-title {
+    font-size: 1.75rem; /* 28px */
+    margin-bottom: 10px;
+  }
+  .upload-close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+  }
+  .tab-button {
+    font-size: 1rem;
+    padding: 10px;
+  }
+  .upload-area-text, .link-input-text {
+    font-size: 1rem;
+  }
+  .browse-files-button, .add-link-button {
+    padding: 10px 20px;
+    font-size: 0.9rem;
+  }
+  .uploaded-items-title {
+    font-size: 1.125rem;
+  }
+  .uploaded-item {
+    padding: 12px;
+  }
+  .item-name {
+    font-size: 0.95rem;
+  }
+}

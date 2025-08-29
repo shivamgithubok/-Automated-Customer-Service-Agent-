@@ -1,0 +1,129 @@
+/* General body styles for displaying the component */
+
+/* Main container for the chat input bar */
+.query-input-container {
+  position: relative;
+  width: 100%;
+  max-width: 56rem; /* Equivalent to max-w-3xl */
+  margin: 0 auto;
+}
+
+/* The chat bar itself */
+.chat-bar {
+    display: flex;
+    align-items: center;
+    position: relative;
+    bottom: 52px;
+    background-color: #1f1f1f;
+    border-radius: 30px;
+    padding: 0.75rem 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+/* General styles for icon buttons */
+.icon-button {
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af; /* text-gray-400 */
+  transition: color 0.2s ease-in-out;
+  padding: 0;
+}
+
+.icon-button:hover {
+  color: #ffffff; /* hover:text-white */
+}
+
+/* Specific margin for the plus icon */
+.plus-button {
+  margin-right: 0.5rem; /* mr-2 */
+}
+
+/* Container for the tools button and its dropdown */
+.tools-container {
+  position: relative;
+}
+
+/* The 'Tools' button */
+.tools-button {
+  display: flex;
+  align-items: center;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af; /* text-gray-400 */
+  transition: color 0.2s ease-in-out;
+}
+
+.tools-button:hover {
+  color: #ffffff; /* hover:text-white */
+}
+
+.tools-button svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 0.25rem;
+}
+
+/* The dropdown menu for tools */
+.tools-dropdown {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 0.5rem; /* mb-2 */
+  width: 12rem; /* w-48 */
+  background-color: #2f2f2f;
+  color: #ffffff;
+  border-radius: 0.5rem; /* rounded-lg */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1); /* shadow-xl */
+  overflow: hidden;
+}
+
+.tools-dropdown a {
+  display: block;
+  padding: 0.5rem 1rem; /* px-4 py-2 */
+  font-size: 0.875rem; /* text-sm */
+  text-decoration: none;
+  color: white;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.tools-dropdown a:hover {
+  background-color: #4b5563; /* hover:bg-gray-700 */
+}
+
+/* The form element containing the input */
+.query-form {
+  flex-grow: 1;
+  margin: 0 1rem; /* mx-4 */
+}
+
+/* The main text input field */
+.query-input {
+  width: 100%;
+  background-color: transparent;
+  border: none;
+  color: #ffffff;
+  outline: none;
+}
+
+.query-input::placeholder {
+  color: #6b7280; /* placeholder-gray-500 */
+}
+
+/* Loading spinner animation */
+.loading-spinner {
+  width: 1.25rem; /* w-5 */
+  height: 1.25rem; /* h-5 */
+  border: 2px dashed #ffffff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

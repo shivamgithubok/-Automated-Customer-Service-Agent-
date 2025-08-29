@@ -1,0 +1,56 @@
+import React from 'react';
+
+const ChatContainer = ({ messages, loading }) => {
+  return (
+    <div className="chat-container">
+      <div className="chat-messages">
+        {messages.length === 0 ? (
+          <div className="welcome-message">
+            <h2>Welcome to Document Mining Assistant</h2>
+            <p>Ask questions about your documents and I'll help you find answers!</p>
+          </div>
+        ) : (
+          messages.map((message, index) => (
+            <div key={index} className={`chat-message ${message.type}`}>
+              <div className="message-icon">
+                {message.type === 'user' ? '👤' : message.type === 'assistant' ? '🤖' : '⚠️'}
+              </div>
+              <div className="message-content">
+                <div className="message-text">{message.content}</div>
+                {message.sources && message.sources.length > 0 && (
+                  <div className="message-sources">
+                    <details>
+                      <summary>Sources ({message.docsFound} documents found)</summary>
+                      <ul>
+                        {message.sources.map((source, idx) => (
+                          <li key={idx}>{source}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  </div>
+                )}
+                <div className="message-timestamp">
+                  {new Date(message.timestamp).toLocaleTimeString()}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+        {loading && (
+          <div className="chat-message assistant loading">
+            <div className="message-icon">🤖</div>
+            <div className="message-content">
+              <div className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ChatContainer;
