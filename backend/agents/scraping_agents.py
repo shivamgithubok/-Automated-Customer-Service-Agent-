@@ -4,7 +4,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmb
 from langchain.prompts import ChatPromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
 import hashlib
 import os
 from pathlib import Path
@@ -12,36 +12,28 @@ from pathlib import Path
 
 class Scraper:
     def __init__(self):
-        # Setup FAISS path (same as RAGAgent)
+        # Setup Chroma path for scraped content
         self.base_path = Path(__file__).parent.parent
-        self.faiss_path = self.base_path / "vectorstore"
-        self.faiss_path.parent.mkdir(parents=True, exist_ok=True)
+        self.chroma_path = self.base_path / "chromadb_scraping"
+        self.chroma_path.mkdir(parents=True, exist_ok=True)
 
         # Embeddings
         self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
-        # Load or create FAISS store
-        if self.faiss_path.exists():
-            self.vector_store = FAISS.load_local(
-                folder_path=str(self.faiss_path),
-                embeddings=self.embeddings,
-                allow_dangerous_deserialization=True
-            )
-        else:
-            self.vector_store = FAISS.from_texts(
-                texts=["Initial setup"],
-                embedding=self.embeddings
-            )
-            self.vector_store.save_local(str(self.faiss_path))
+        # Initialize Chroma store
+        self.vector_store = Chroma(
+            persist_directory=str(self.chroma_path),
+            embedding_function=self.embeddings,
+            collection_name="scraped_content"
+        )
 
         self.document_ids = {}  # maps content_hash -> url
 
-    def save_vectorstore(self):
-        """Persist FAISS index"""
+    def persist_vectorstore(self):
+        """Persist ChromaDB store"""
         if self.vector_store is None:
-            raise ValueError("No vector store to save")
-        self.faiss_path.mkdir(parents=True, exist_ok=True)
-        self.vector_store.save_local(str(self.faiss_path))
+            raise ValueError("No vector store to persist")
+        self.vector_store.persist()
 
     def generate_hash(self, text: str) -> str:
         """Generate unique hash for deduplication"""
@@ -51,17 +43,46 @@ class Scraper:
     # 1. Scrape website and store
     # ------------------------
     def scrape_website(self, url: str) -> dict:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
+        """Scrape website content and store in vector database"""
+        try:
+            # Validate URL
+            if not url:
+                raise ValueError("URL cannot be empty")
+                
+            # Add headers to mimic a browser request
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            # Fetch the webpage
+            response = requests.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
 
-        soup = BeautifulSoup(response.content, "html.parser")
+            # Ensure we're getting HTML content
+            content_type = response.headers.get('content-type', '').lower()
+            if 'text/html' not in content_type:
+                raise ValueError(f"Invalid content type: {content_type}")
 
-        # Remove unwanted tags
-        for script_or_style in soup(["script", "style"]):
-            script_or_style.decompose()
+            # Parse HTML
+            soup = BeautifulSoup(response.content, "html.parser")
 
-        text = soup.get_text(separator=" ")
-        clean_text = " ".join(text.split())
+            # Remove unwanted elements
+            for element in soup(['script', 'style', 'head', 'title', 'meta', '[document]', 'header', 'footer', 'nav']):
+                element.decompose()
+
+            # Extract text with better formatting
+            text = soup.get_text(separator='\n', strip=True)
+            
+            # Clean the text
+            clean_text = ' '.join(line.strip() for line in text.splitlines() if line.strip())
+            
+            if not clean_text:
+                raise ValueError("No content found on the webpage")
+                
+        except requests.RequestException as e:
+            raise ValueError(f"Failed to fetch webpage: {str(e)}")
+        except Exception as e:
+            raise ValueError(f"Error scraping webpage: {str(e)}")
 
         # Generate unique hash
         doc_hash = self.generate_hash(clean_text)
@@ -75,22 +96,24 @@ class Scraper:
         # Split into chunks
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         texts = splitter.split_text(clean_text)
-        docs = [Document(page_content=chunk, metadata={"source": url}) for chunk in texts]
+        docs = [Document(page_content=chunk, metadata={
+            "source": url,
+            "doc_hash": doc_hash,
+            "chunk_id": f"{doc_hash}_{i}"
+        }) for i, chunk in enumerate(texts)]
 
-        # Add to FAISS
-        if self.vector_store is None:
-            self.vector_store = FAISS.from_documents(docs, self.embeddings)
-        else:
-            self.vector_store.add_documents(docs)
-
-        # Save
+        # Add to ChromaDB
+        self.vector_store.add_documents(docs)
+        
+        # Persist changes
         self.document_ids[doc_hash] = url
-        self.save_vectorstore()
-
+        self.persist_vectorstore()
+        print(docs)
         return {
             "status": "success",
             "chunks_processed": len(docs),
-            "document_id": url
+            "document_id": url,
+            "collection": "scraped_content"
         }
 
     # ------------------------
@@ -114,27 +137,53 @@ class Scraper:
         if not self.vector_store:
             raise ValueError("❌ No data indexed yet. Scrape a website first.")
 
-        retriever = self.vector_store.as_retriever(search_kwargs={"k": k})
-        docs = retriever.get_relevant_documents(question)
-        context = "\n\n".join([d.page_content for d in docs])
+        if not self.vector_store:
+            raise ValueError("❌ No data indexed yet. Scrape a website first.")
+
+        # Use direct similarity search without search_type parameter
+        docs = self.vector_store.similarity_search(
+            query=question,
+            k=k
+        )
+        
+        # Join document content with source information
+        context = "\n\n".join([
+            f"{d.page_content}\nSource: {d.metadata.get('source', 'Unknown')}"
+            for d in docs
+        ])
 
         llm = self.get_llm()
 
         prompt = ChatPromptTemplate.from_messages([
-                ("system", 
-                "You are a precise assistant. Use ONLY the provided context to answer. "
-                "If the answer is not explicitly in the context, reply with: 'Not found in provided sources.'\n\n"
-                "When answering, cite the relevant source section (e.g., heading, title, or file name) "
-                "so the user knows where it came from."
-                ),
-                ("human", 
-                "Context (from HTML source):\n{context}\n\n"
-                "Question: {question}\n\n"
-                "Answer format:\n"
-                "- Direct answer\n"
-                "- Cite the exact section or snippet from context where answer was found"
-                )
-            ])
+            ("system", 
+            "You are a precise assistant. Use ONLY the provided context to answer. "
+            "If the answer is not explicitly in the context, reply with: 'Not found in provided sources.'\n\n"
+            "When answering, cite the relevant source section (e.g., heading, title, or file name) "
+            "so the user knows where it came from.\n\n"
+            "If the user mentions specific columns and scraping criteria (such as class or ID names), "
+            "scrape the provided HTML context for the relevant data and organize it into the requested table format.\n"
+            "For example, if the user provides class names 'container' and 'fruit-price', "
+            "scrape the data from the 'container' class for the fruit names and from 'fruit-price' for the prices.\n\n"
+            "Example:\n"
+            "User query: 'Scrape the fruit names from the 'container' class and the prices from the 'fruit-price' class. Present them in a table.'\n"
+            "Assistant response: \n"
+            "| Fruit Name  | Price  |\n"
+            "|-------------|--------|\n"
+            "| Apple       | $2.99  |\n"
+            "| Banana      | $1.49  |\n"
+            "| Cherry      | $3.99  |\n"
+            "*Source: Scraped from the 'container' and 'fruit-price' classes*\n"
+            ),
+            ("human", 
+            "Context (from HTML source):\n{context}\n\n"
+            "Question: {question}\n\n"
+            "Answer format:\n"
+            "- Direct answer\n"
+            "- Cite the exact section or snippet from context where answer was found\n"
+            "- If scraping is requested, organize the data into columns and format it as a markdown table"
+            )
+        ])
+
 
         chain = prompt | llm
         response = chain.invoke({"context": context, "question": question})

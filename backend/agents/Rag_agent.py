@@ -1,339 +1,207 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain.storage import InMemoryStore
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_core.documents import Document
-from langchain.prompts import PromptTemplate
-import PyPDF2
-import chardet
-from typing import List, Tuple, Dict
-import hashlib
-
-
+from langchain.retrievers import ParentDocumentRetriever
+from langchain_community.document_loaders import UnstructuredFileLoader
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+from sentence_transformers import CrossEncoder
+from typing import List, Dict
 
 # Load environment variables
-env_path = Path(__file__).parent.parent / '.env'
-
-if env_path.exists():
-    load_dotenv(dotenv_path=env_path)
-
+load_dotenv()
 
 class RAGAgent:
     def __init__(self):
-        # Setup paths
         self.base_path = Path(__file__).parent.parent
-        self.faiss_path = self.base_path / "vectorstore"
-        self.faiss_path.parent.mkdir(parents=True, exist_ok=True)
+        self.faiss_path = self.base_path / "production_vectorstore" # Use a new store
+        self.docstore_path = self.base_path / "production_docstore"
+        self.embeddings_model = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_kwargs={'device': 'cpu'}
+        )
+        self.child_splitter = RecursiveCharacterTextSplitter(chunk_size=400)
+        self.parent_splitter = RecursiveCharacterTextSplitter(chunk_size=2000)
+        self.vectorstore = None 
+        self.store = InMemoryStore()
 
-        # Initialize conversation history
-        self.conversation_history: List[Tuple[str, str]] = []
+        self.retriever = None # Will be initialized in `load_or_create_retriever`
 
-        # Load API key and configure Google AI
-        self.api_key = os.getenv("GOOGLE_API_KEY")
-        if not self.api_key:
-            raise ValueError("GOOGLE_API_KEY not found in environment variables")
+        # 3. Cross-Encoder for Re-ranking
+        #    This model is much better at determining relevance than the initial search.
+        self.reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2', max_length=512)
 
-        try:
-            self.embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/embedding-001"
+        # --- Part 3: A Better Brain ---
+        
+        # 1. Powerful LLM and Output Parser
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            temperature=0.7,
+            google_api_key=os.getenv("GOOGLE_API_KEY")
+        )
+        self.output_parser = StrOutputParser()
+
+        # 2. Advanced Prompt Engineering (Persona + Chain-of-Thought)
+        self.prompt_template = self._create_prompt_template()
+
+        # Initialize the retriever and vector store
+        self.load_or_create_retriever()
+
+    def _create_prompt_template(self) -> PromptTemplate:
+        """
+        --- The Production-Grade General Assistant Prompt ---
+        This prompt instructs the LLM to act as an expert synthesizer of information,
+        focusing on user intent, logical reasoning, and providing comprehensive, trustworthy answers.
+        """
+        template = """
+        You are an expert Enterprise Knowledge Assistant. Your purpose is to help company employees find information and understand complex documents quickly and accurately. You are not just a search engine; you are a reasoning and synthesis engine.
+
+        **YOUR CORE DIRECTIVE:**
+        Your primary goal is to synthesize the information in the provided `CONTEXT FROM DOCUMENTS` to give a comprehensive, logical, and easy-to-understand answer to the user's `QUESTION`.
+
+        **HERE IS YOUR STEP-BY-STEP THINKING PROCESS:**
+
+        1.  **Deconstruct the User's Question:** First, analyze the `QUESTION` and the `CHAT HISTORY`. What is the user's *real* intent? Are they asking for a specific fact, a summary, a comparison, or a step-by-step process?
+
+        2.  **Scour the Context:** Read through all the provided `CONTEXT FROM DOCUMENTS`. Identify all relevant paragraphs, sentences, data points, and examples that relate to the user's intent.
+
+        3.  **Synthesize, Don't Just Recite:** Do NOT just copy and paste chunks from the context. Your value is in your ability to connect the dots. Synthesize the key points from the different parts of the context into a single, coherent, and logical answer. If the context provides a process, lay it out in clear steps. If it provides data, summarize the key findings.
+
+        4.  **Answer Completely and Confidently:** Formulate your final answer. Start with a direct response, then provide the supporting details or examples you synthesized from the context. Write in a clear, professional, and helpful tone.
+
+        **CRITICAL RULES FOR TRUST AND ACCURACY:**
+
+        *   **GROUNDING IS EVERYTHING:** You MUST base your entire answer *strictly* on the information found within the `CONTEXT FROM DOCUMENTS`.
+        *   **HANDLE MISSING INFORMATION:** If the context does not contain the information needed to answer the question, you must clearly state that. For example, say: "Based on the documents provided, I could not find information regarding [the user's topic]." **DO NOT, under any circumstances, make up information or use external knowledge.**
+        *   **HANDLE AMBIGUITY:** If the user's question is vague, ask for clarification. For example: "To give you the most accurate answer, could you please specify which financial quarter you are interested in?"
+
+        ---
+        **CHAT HISTORY (for conversational context):**
+        {chat_history}
+        ---
+        **CONTEXT FROM DOCUMENTS (your source of truth):**
+        {context}
+        ---
+        **QUESTION (the user's request):**
+        {question}
+        ---
+        **SYNTHESIZED ANSWER:**
+        """
+        return PromptTemplate.from_template(template)
+    
+    def load_or_create_retriever(self):
+        """Initializes the entire retrieval system (vector store, doc store, and retriever)."""
+        if self.faiss_path.exists():
+            print(f"Loading existing vector store from {self.faiss_path}...")
+            self.vectorstore = FAISS.load_local(
+                folder_path=str(self.faiss_path),
+                embeddings=self.embeddings_model,
+                allow_dangerous_deserialization=True
             )
+        else:
+            print("Creating a new, empty vector store.")
+            # Create a dummy index to start with
+            dummy_texts = ["initialization text"]
+            self.vectorstore = FAISS.from_texts(texts=dummy_texts, embedding=self.embeddings_model)
+            self.vectorstore.delete(self.vectorstore.index_to_docstore_id.values()) # Clear dummy text
+            self.vectorstore.save_local(str(self.faiss_path))
 
-            self.vector_store = None
-            self.document_ids = {}  # Store document hashes here
-            self.load_or_create_vectorstore()
+        # The ParentDocumentRetriever orchestrates the search-and-retrieve process
+        self.retriever = ParentDocumentRetriever(
+            vectorstore=self.vectorstore,
+            docstore=self.store,
+            child_splitter=self.child_splitter,
+            parent_splitter=self.parent_splitter,
+        )
+        print("Retriever is ready.")
 
-        except Exception as e:
-            raise
+    def process_documents(self, file_paths: List[str]):
+        """
+        Processes a list of files using Unstructured.io, splits them into parent/child chunks,
+        and adds them to the retriever's stores.
+        """
+        for file_path in file_paths:
+            try:
+                print(f"Processing document: {file_path}")
+                # UnstructuredFileLoader can handle .pdf, .docx, .txt, .pptx, and more.
+                loader = UnstructuredFileLoader(file_path)
+                docs = loader.load()
+                
+                # This single call handles splitting, embedding, and storing both
+                # parent and child documents.
+                self.retriever.add_documents(docs, ids=None)
+                
+                # Persist the updated vector store to disk
+                self.vectorstore.save_local(str(self.faiss_path))
+                print(f"Successfully processed and stored {file_path}")
+            except Exception as e:
+                print(f"Failed to process {file_path}. Error: {e}")
 
-    def load_or_create_vectorstore(self):
-        """Load existing FAISS index or create a new one"""
-        try:
-            if self.faiss_path.exists():
-                self.vector_store = FAISS.load_local(
-                    folder_path=str(self.faiss_path),
-                    embeddings=self.embeddings,
-                    allow_dangerous_deserialization=True  # We trust our own files
-                )
-            else:
-                self.vector_store = FAISS.from_texts(
-                    texts=["Initial setup"],
-                    embedding=self.embeddings
-                )
-                self.save_vectorstore()
-        except Exception as e:
-            raise
+    def _get_and_rerank_documents(self, question: str) -> List[Dict]:
+        """
+        Retrieves initial documents and then uses a CrossEncoder to re-rank them
+        for higher relevance before passing them to the LLM.
+        """
+        print("Retrieving initial documents...")
+        # 1. Retrieve initial documents using the ParentDocumentRetriever
+        sub_docs = self.vectorstore.similarity_search(question, k=20)
+        retrieved_docs = self.retriever.invoke(question) # Gets the parent docs
 
-    def save_vectorstore(self):
-        """Save the FAISS index to disk"""
-        try:
-            if self.vector_store is None:
-                raise ValueError("No vector store to save")
+        if not retrieved_docs:
+            return []
 
-            # Ensure the directory exists
-            self.faiss_path.mkdir(parents=True, exist_ok=True)
+        # 2. Re-rank the retrieved documents
+        print(f"Re-ranking {len(retrieved_docs)} documents...")
+        pairs = [[question, doc.page_content] for doc in retrieved_docs]
+        scores = self.reranker.predict(pairs)
+        
+        # Combine docs with their scores and sort
+        scored_docs = list(zip(scores, retrieved_docs))
+        scored_docs.sort(key=lambda x: x[0], reverse=True)
+        
+        # Select the top 4 most relevant documents
+        top_docs = []
+        for score, doc in scored_docs[:4]:
+            top_docs.append({
+                "content": doc.page_content,
+                "metadata": doc.metadata,
+                "score": float(score)
+            })
+        
+        print(f"Selected {len(top_docs)} documents after re-ranking.")
+        return top_docs
 
-            # Save the FAISS index
-            self.vector_store.save_local(str(self.faiss_path))
-        except Exception as e:
-            raise (f"Error saving vector store: {str(e)}")
+    def query(self, question: str, chat_history: List[Dict[str, str]]) -> str:
+        """
+        The main method to ask a question. It orchestrates retrieval, re-ranking,
+        prompting, and generation, all while being aware of the conversation history.
+        """
+        # 1. Retrieve and re-rank documents
+        reranked_docs = self._get_and_rerank_documents(question)
+        context_text = "\n\n---\n\n".join([doc['content'] for doc in reranked_docs])
 
-    def process_document(self, file_path: str) -> dict:
-        """Process and store document embeddings, avoiding duplicates."""
-        try:
-            # Convert to Path object and validate
-            file_path = Path(file_path)
-            if not file_path.exists():
-                raise FileNotFoundError(f"File not found: {file_path}")
+        # 2. Format chat history for the prompt
+        formatted_history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
 
-            # Simple file type detection based on extension
-            file_extension = file_path.suffix.lower()
-
-            if file_extension == '.pdf':
-                document_text = self.extract_text_from_pdf(str(file_path))
-            elif file_extension == '.txt':
-                document_text = self.read_text_file(str(file_path))
-            else:
-                raise ValueError(f"Unsupported file type: {file_extension}. Only .pdf and .txt files are supported.")
-
-            # Generate a unique hash ID for the document based on its content
-            document_hash = self.generate_document_hash(document_text)
-
-            # Check if the document ID already exists in the vector store
-            if document_hash in self.document_ids:
-                # Document already exists, return existing ID
-                return {
-                    "status": "success",
-                    "message": "Document already processed",
-                    "document_id": self.document_ids[document_hash]
-                }
-
-            # Split the document into smaller chunks for processing
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=200,
-                separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]
-            )
-            texts = text_splitter.split_text(document_text)
-
-            # Convert to documents
-            docs = [Document(page_content=text) for text in texts]
-
-            # Add documents to the vector store and store their ID
-            if self.vector_store is None:
-                self.vector_store = FAISS.from_documents(docs, self.embeddings)
-            else:
-                self.vector_store.add_documents(docs)
-
-            # Store the document hash and associated ID for future checks
-            self.document_ids[document_hash] = file_path.name  
-            # Save updated vector store
-            self.save_vectorstore()
-            print(f"Document {file_path.name} processed and added with ID {self.document_ids[document_hash]}")
-            return {
-                "status": "success",
-                "chunks_processed": len(texts),
-                "file_name": Path(file_path).name,
-                "file_type": file_extension,
-                "document_id": self.document_ids[document_hash]
+        # 3. Create the LangChain Expression Language (LCEL) chain
+        chain = (
+            {
+                "context": lambda x: context_text, 
+                "question": RunnablePassthrough(), 
+                "chat_history": lambda x: formatted_history, 
             }
+            | self.prompt_template
+            | self.llm
+            | self.output_parser
+        )
 
-        except Exception as e:
-            raise ValueError(f"Error processing document: {str(e)}")
-
-    def generate_document_hash(self, document_text: str) -> str:
-        """Generate a hash value for the document to identify it uniquely."""
-        return hashlib.sha256(document_text.encode('utf-8')).hexdigest()
-
-
-    def extract_text_from_pdf(self, file_path: str) -> str:
-        """Extract text from a PDF file"""
-        try:
-            with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                text = []
-                for page in pdf_reader.pages:
-                    text.append(page.extract_text())
-                return "\n".join(text)
-        except Exception as e:
-            raise (f"Error extracting text from PDF: {str(e)}")
-
-    def read_text_file(self, file_path: str) -> str:
-        """Read text from a file with proper encoding detection"""
-        try:
-            # Detect the encoding
-            with open(file_path, 'rb') as file:
-                raw_data = file.read()
-                result = chardet.detect(raw_data)
-                encoding = result['encoding'] if result['encoding'] else 'utf-8'
-
-            # Read the file with detected encoding
-            with open(file_path, 'r', encoding=encoding) as file:
-                return file.read()
-
-        except Exception as e:
-            raise (f"Error reading text file: {str(e)}")
-
-    def query(self, question: str, k: int = 2) -> dict:
-        """Query the vector store and generate a response with context and justification."""
-        try:
-            if not self.vector_store:
-                return {"error": "No documents have been processed yet"}
-
-            # Search for relevant documents
-            relevant_docs = self.vector_store.similarity_search(question, k=k)
-
-            if not relevant_docs:
-                return {"answer": "No relevant documents found.", "justification": "", "context": "", "source_documents": []}
-
-            
-            context = "\n".join([doc.page_content[:] + "..." for doc in relevant_docs])  # Limit to 150 chars per doc
-
-            # Initialize LLM if not already done
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
-                temperature=0.7,
-            )
-
-            prompt_template = PromptTemplate(
-                    input_variables=["question", "context"],
-                    template="""
-                        You are a helpful assistant. Analyze the question type and provide a focused response based on the context. The document contains several sections, each with a title. Please identify the sections, and answer based on the relevant section.
-
-                        -------------------------------------------------------
-                        ## Example Question:
-                        "What is the education background of the individual?"
-
-                        ## Answer (provide only the specific information requested):
-                        B.Tech in Electronics and Communication Engineering (Specialization in VLSI) Nov 2022 - Present, CGPA: 7.76
-
-                        -------------------------------------------------------
-                        ## Example Question:
-                        "What are the technical skills of the person?"
-
-                        ## Answer (provide only the specific information requested):
-                        Machine Learning, Deep Learning, Image Processing, NLP, Transformers, GenerativeAI, LLM, langchain, langgraph, Agent, etc.
-
-                        -------------------------------------------------------
-                        ## Example Question:
-                        "Can you tell me about the professional experience?"
-
-                        ## Answer (provide only the specific information requested):
-                        AI Intern at Edunet Foundation, built plant disease detection model with CNNs, reached 95% accuracy.
-
-                        -------------------------------------------------------
-                        ## Example Question:
-                        "what is his github account"
-
-                        ## Answer (provide only the specific information requested):
-                        https://github.com/username
-                        
-                        --------------------------------------------------------
-                        ## Example Question:
-                        "What is the person's LinkedIn profile?"
-
-                        ## Answer (provide only the specific information requested):
-                        https://www.linkedin.com/in/username
-                         
-                        ---------------------------------------------------------
-
-                        ## Example Question:
-                        "What is the person's Kaggle profile"
-
-                        ## Answer (provide only the specific information requested):
-                        https://www.kaggle.com/username
-
-                        ----------------------------------------------------------
-
-                        ## Example Question:
-                        "What is the email in the documents"
-
-                        ## Answer (provide only the specific information requested):
-                        example@email.com, example2@email.ac.in , Email: shivachadhhary@gmail.com 
-
-                        ----------------------------------------------------------
-
-                        ## Example Question:
-                        " Position of Responsibility"
-
-                        ## Answer (provide only the specific information requested):
-                        VLSI Club Associate Member, General Secretary at Mekanika (Sep 2023- Present), NSS Unit Leader (Dec 2022- Apr 2024)
-                         
-                        ----------------------------------------------------------
-
-                        ## Example Question:
-                        "Describe name project"
-
-                        ## Answer (provide only the specific information requested):
-                        .Implemented dialogue summarization by adapting BART-Large-CNN to the SAMSum dataset (16,369 dialogues),
-                        .Optimized AutoTokenizer, reducing processing time by 30%.
-                        .Secured a ROUGE-2 score of 0.23 maintaining crucial dialogue context.                        
-                        -----------------------------------------------------------
-
-                        ## Example Question:
-                        "Achievements"
-
-                        ## Answer (provide only the specific information requested):
-                        VLSI Club Associate Member, Kaggle Contributor, Top 30 in CodeRush by Codeforces Master
-
-                        ----------------------------------------------------------
-
-                        ## Example Question:
-                        "What projects has the person worked on?"
-
-                        ## Answer (provide only the specific information requested):
-                        Dialogue Summarization Using BART-Large-CNN, Smart-Assistant-for-Research-Summarization, Spam Message Detection, etc.
-
-                        -------------------------------------------------------
-                        ## Example Question:
-                        "What extracurricular activities has the person been involved in?"
-
-                        ## Answer (provide only the specific information requested):
-                        VLSI Club Associate Member, Kaggle Contributor, Top 30 in CodeRush by Codeforces Master
-
-                        -------------------------------------------------------
-                        Now, for the user's input, respond according to the question type:
-                        ## Question:
-                        {question}
-                        -------------------------------------------------------
-                        ## Context:
-                        {context}
-
-                        -------------------------------------------------------
-                        ## Instructions:
-                        1. Identify each **section** in the document (e.g., Education, Professional Experience, Projects, etc.).
-                        2. Answer based on the content of the relevant section.
-                        3. If the question relates to a section, use the content from that section to form the answer.
-                    """
-                )
-
-
-            # Generate prompt
-            prompt = prompt_template.format(
-                question=question,
-                context=context,
-            )
-
-            # Get response from LLM
-            response = llm.invoke(prompt)
-            answer = response.content.strip()
-
-            # Create concise justification based on top document
-            justification = f"This answer is based on the following context from the most relevant document: {relevant_docs[0].page_content[:300]}..."
-
-            # Update conversation history
-            self.conversation_history.append((question, answer))
-
-            # Prepare response
-            response = {
-                "answer": answer or "No answer found",
-                "justification": justification,
-                "context": context,
-                "source_documents": [doc.page_content[:300] for doc in relevant_docs[:1]],  
-                "num_docs_found": len(relevant_docs)
-            }
-            return response
-
-        except Exception as e:
-            return {"error": f"Error processing query: {str(e)}"}
+        # 4. Invoke the chain to get the answer
+        print("Invoking LLM chain to generate answer...")
+        answer = chain.invoke(question)
+        return answer
