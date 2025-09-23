@@ -12,7 +12,7 @@ from agents.Rag_agent import RAGAgent
 from agents.scraping_agents import Scraper
 from agents.Mcp_agents import mcp_ask
 import logging
-from agents.HTML_page_agent import scrape_website, answer_query
+from backend.agents.old.HTML_page_agent import scrape_website, answer_query
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

@@ -43,7 +43,7 @@ class RAGAgent:
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash",
             temperature=0.7,
-            google_api_key=os.getenv("GOOGLE_API_KEY")
+            api_key=os.getenv("GOOGLE_API_KEY")
         )
         self.output_parser = StrOutputParser()
 

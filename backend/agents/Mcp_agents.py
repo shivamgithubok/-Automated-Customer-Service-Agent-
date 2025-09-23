@@ -17,12 +17,13 @@ load_dotenv()
 llm = ChatGoogleGenerativeAI(
     model="gemini-1.5-flash",
     temperature=0.1,
+    api_key=os.getenv("GOOGLE_API_KEY")
 )
 
 print("Initializing local embedding model (all-MiniLM-L6-v2)...")
 embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2",
-    model_kwargs={'device': 'cpu'} # Use 'cuda' if you have a GPU
+    model_kwargs={'device': 'cpu'} 
 )
 print("Embedding model loaded.")
 
