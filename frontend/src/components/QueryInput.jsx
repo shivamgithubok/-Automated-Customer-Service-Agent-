@@ -20,11 +20,14 @@ const MicrophoneIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 12.75a.75.75 0 0 0 .75-.75v-4.5a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 .75.75Z" />
   </svg>
 );
+// const response = await fetch('http://localhost:5000/scrap', {
+      // method: 'POST',
+      // headers: { "Content-Type": "application/json" },
+      // body: JSON.stringify({ url: linkInput })
+    // });
 
-
-const QueryInput = ({ value, onChange, onSubmit, loading }) => {
+const QueryInput = ({ value, onChange, onSubmit, onMcpClick, onScrapClick, loading }) => {
   const [showTools, setShowTools] = useState(false);
-
   return (
     <div className="query-input-container">
       <div className="chat-bar">
@@ -44,8 +47,25 @@ const QueryInput = ({ value, onChange, onSubmit, loading }) => {
           </button>
           {showTools && (
             <div className="tools-dropdown">
-              <a href="#">MCP Mode</a>
-              <a href="#">Download Report</a>
+              <div 
+                className="tool-item1" 
+                onClick={() => {
+                  onMcpClick();
+                  setShowTools(false); 
+                }}
+              >
+                MCP SERVER
+              </div>
+              <br></br>
+              <div 
+                className="tool-item2" 
+                onClick={() => {
+                  onScrapClick();
+                  setShowTools(false);
+                }}
+              >
+                SCRAP MODE
+              </div>
             </div>
           )}
         </div>

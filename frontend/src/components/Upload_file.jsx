@@ -43,7 +43,7 @@ const uploadFilesToBackend = async (files) => {
       formData.append('files', file); // Changed to 'files' to match backend
     });
 
-    const response = await fetch('http://localhost:5000/upload', {
+    const response = await fetch('http://localhost:5000/api/upload', {
       method: 'POST',
       body: formData
     });

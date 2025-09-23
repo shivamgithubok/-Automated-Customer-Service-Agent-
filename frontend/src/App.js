@@ -19,7 +19,66 @@ function App() {
   const [selectedUploadType, setSelectedUploadType] = useState("document"); 
   const [linkInput, setLinkInput] = useState('url');
 
+  const handleMcpQuery = async () => {
+    // Check if there's a question to ask
+    if (!queryInput.trim()) {
+      const errorMessage = {
+        type: 'error',
+        content: 'Please enter a question first.',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      return;
+    }
 
+    setLoading(true);
+    
+    // Add user message immediately
+    const userMessage = {
+      type: 'user',
+      content: queryInput,
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, userMessage]);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/ask-mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question: queryInput }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to get response from MCP server');
+      }
+
+      const aiMessage = {
+        type: 'assistant',
+        content: data.answer,
+        timestamp: new Date().toISOString(),
+        isMcp: true
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+      setResponse(data.answer);
+      setQueryInput(''); // Clear input after successful response
+
+    } catch (error) {
+      console.error('MCP Error:', error);
+      const errorMessage = {
+        type: 'error',
+        content: error.message || 'Error connecting to MCP server. Please try again.',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleStartClick = () => {
     setIsStarted(true);
@@ -74,11 +133,12 @@ const handleQuerySubmit = async (e) => {
 
   try {
     // Send the query to the backend
-    let endpoint = "http://localhost:5000/ask";
+    let endpoint = "http://localhost:5000/api/ask-rag";
+    console.log("Selected Upload Type:", selectedUploadType);
     if (selectedUploadType === "link") {
-      endpoint = "http://localhost:5000/ask_scrap";
+      endpoint = "http://localhost:5000/api/ask-scraped";
     }
-
+    
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -188,6 +248,7 @@ const handleQuerySubmit = async (e) => {
             value={queryInput}
             onChange={setQueryInput}
             onSubmit={handleQuerySubmit}
+            onMcpClick={handleMcpQuery}
             loading={loading}
           />
         </>

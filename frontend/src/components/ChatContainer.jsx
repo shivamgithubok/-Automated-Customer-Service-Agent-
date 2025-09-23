@@ -8,6 +8,7 @@ const ChatContainer = ({ messages, loading }) => {
           <div className="welcome-message">
             <h2>Welcome to Document Mining Assistant</h2>
             <p>Ask questions about your documents and I'll help you find answers!</p>
+            <h1>UPLOAD YOUR DOCUMENTS TO GET STARTED</h1>
           </div>
         ) : (
           messages.map((message, index) => (
