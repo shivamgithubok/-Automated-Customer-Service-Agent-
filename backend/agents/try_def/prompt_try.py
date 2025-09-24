@@ -13,7 +13,7 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from sentence_transformers import CrossEncoder
 from typing import List, Dict
-from prompts.formate import FormatPrompt  # Import the format prompt
+from ..prompts.formate import FormatPrompt
 
 # Load environment variables
 load_dotenv()

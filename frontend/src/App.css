@@ -378,7 +378,7 @@ body {
   background: rgba(220, 38, 38, 0.1);
 }
 
-.message-icon {
+/* .message-icon {
   font-size: 1.5rem;
   min-width: 40px;
   height: 40px;
@@ -387,7 +387,7 @@ body {
   justify-content: center;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 50%;
-}
+} */
 
 .message-content {
   flex-grow: 1;
@@ -863,4 +863,40 @@ body {
   .query-input {
     width: 100%;
   }
+}
+
+
+
+
+/* Markdoewn */
+/* Add this to your main CSS file to style tables from Markdown */
+
+.message-text table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  background-color: rgb(16, 16, 16);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.message-text th,
+.message-text td {
+  border: 1px solid #515153;
+  padding: 10px 12px;
+  color: aliceblue;
+  text-align: left;
+}
+
+.message-text th {
+  background-color: #0b0b0b;
+  font-weight: 600;
+}
+strong{
+  color: white
+}
+
+.message-text tr:nth-child(even) {
+  background-color: #060707;
 }

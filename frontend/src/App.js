@@ -5,6 +5,7 @@ import ChatContainer from './components/ChatContainer';
 import HistorySidebar from './components/HistorySidebar';
 import QueryInput from './components/QueryInput';
 import UploadPanelWrapper from './components/UploadPanelWrapper';
+import ReactMarkdown from 'react-markdown';
 
 function App() {
   const [isPanelVisible, setIsPanelVisible] = useState(false);

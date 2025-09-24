@@ -66,9 +66,9 @@ class FormatPrompt:
         \\text{{Formula: }} \\quad {formula}
         ```
         Where:
-        - \( E \) is the energy in joules,
-        - \( m \) is the mass in kilograms,
-        - \( c \) is the speed of light in meters per second.
+        - \\( E \\) is the energy in joules,
+        - \\( m \\) is the mass in kilograms,
+        - \\( c \\) is the speed of light in meters per second.
             """
 
         return prompt
