@@ -153,13 +153,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## UI Screenshots 📸
 
 ### Welcome Screen
-<img src="frontend/src/assets/images/welcome-screen.png" alt="Welcome Screen" width="800"/>
+<img src="assets/home.png" alt="Welcome Screen" width="800"/>
+
+### MainCHAT Upload
+<img src="assets/main_file.png" alt="Upload Interface" width="800"/>
+
+### MCP Interface
+<img src="assets/mcp_inte.png" alt="Chat Interface" width="800"/>
 
 ### Document Upload
-<img src="frontend/src/assets/images/upload-interface.png" alt="Upload Interface" width="800"/>
-
-### Chat Interface
-<img src="frontend/src/assets/images/chat-interface.png" alt="Chat Interface" width="800"/>
+<img src="assets/doc_up.png" alt="Scraping Tool" width="800"/>
 
 ### Scraping Tool
-<img src="frontend/src/assets/images/scraping-tool.png" alt="Scraping Tool" width="800"/>
+<img src="assets/doc_up.png" alt="Scraping Tool" width="800"/>
