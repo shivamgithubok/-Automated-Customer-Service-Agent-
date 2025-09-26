@@ -39,7 +39,7 @@ class ScrapingAgent:
 
         # --- Cache for storing the full, raw HTML of scraped pages ---
         self.html_cache: Dict[str, str] = {}
-        self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0, api_key=os.getenv("GOOGLE_API_KEY"))
+        self.llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0, api_key=os.getenv("GOOGLE_API_KEY"))
 
     def generate_hash(self, text: str) -> str:
         return hashlib.sha256(text.encode("utf-8")).hexdigest()

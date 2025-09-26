@@ -84,30 +84,44 @@ async def upload_files(files: List[UploadFile] = File(...)):
 async def ask_rag_agent(request: AskRagRequest):
     """
     Ask a question specifically to the RAG Agent.
-    Use this for in-depth, conversational queries about your uploaded documents.
+    Use this for in-depth, conversational queries about uploaded documents.
     """
     if not rag_agent:
         raise HTTPException(status_code=500, detail="RAG Agent not initialized.")
+
+    # Validate request
+    if not request.question or not request.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
 
     session_id = request.session_id or str(uuid.uuid4())
     chat_history = conversations_rag.get(session_id, [])
 
     try:
-        answer = rag_agent.query(request.question, chat_history)
-
+        # Get response from RAG agent
+        response = rag_agent.query(request.question, chat_history)
+        
+        if isinstance(response, dict) and "error" in response:
+            raise HTTPException(status_code=500, detail=response["error"])
+        
+        # Update chat history
         chat_history.append({"role": "user", "content": request.question})
-        chat_history.append({"role": "assistant", "content": answer})
-        conversations_rag[session_id] = chat_history
+        chat_history.append({"role": "assistant", "content": response["answer"] if isinstance(response, dict) else response})
+        conversations_rag[session_id] = chat_history[-10:]  # Keep last 10 messages
 
         return {
             "agent_used": "RAG Agent",
-            "answer": answer,
-            "session_id": session_id,
+            "answer": response["answer"] if isinstance(response, dict) else response,
+            "context": response.get("context") if isinstance(response, dict) else None,
+            "sources": response.get("source_documents") if isinstance(response, dict) else None,
+            "session_id": session_id
         }
     except Exception as e:
-        logger.error(f"Error in RAG Agent query: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="An error occurred with the RAG agent.")
+        logger.error(f"Error in RAG Agent query: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"An error occurred with the RAG agent: {str(e)}"
+        )
 
 @router.post("/ask-mcp")
 async def ask_mcp_agent(request: AskMcpRequest):
