@@ -166,3 +166,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### Scraping Tool
 <img src="assets/doc_up.png" alt="Scraping Tool" width="800"/>
+
+
+## BACKEND Screenshots 📸
+
+<img src="assets/Backend.png" alt="all routes" width="800"/>
