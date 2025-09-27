@@ -171,3 +171,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## BACKEND Screenshots 📸
 
 <img src="assets/Backend.png" alt="all routes" width="800"/>
+
+### scrap backend
+<img src="assets/scrap.png" alt="all routes" width="800"/>
+
+### MCP test
+<img src="assets/mcp_test.png" alt="all routes" width="800"/>
+
+
+### Formate test
+<img src="assets/result.png" alt="all routes" width="800"/>
+
+
+### result backend
+<img src="assets/result1.png" alt="all routes" width="800"/>
